@@ -1,112 +1,26 @@
-import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext.jsx";
-
-export default function BuySellModal({ stock, defaultType = "BUY", onClose, onTradeSuccess }) {
-  const { balance, executeTrade } = useAuth();
-  const [type,       setType]       = useState(defaultType);
-  const [qty,        setQty]        = useState(1);
-  const [orderType,  setOrderType]  = useState("MARKET");
-  const [limitPrice, setLimitPrice] = useState(stock?.price || 0);
-  const [submitting, setSubmitting] = useState(false);
-
-  const execPrice = orderType === "MARKET" ? stock?.price : limitPrice;
-  const total     = qty * execPrice;
-  const canAfford = type === "BUY" ? total <= balance : true;
-
-  const handleSubmit = async () => {
-    if (!canAfford) return;
-    setSubmitting(true);
-    const success = await executeTrade(
-      stock.symbol, type, parseInt(qty), execPrice,
-      stock.name || stock.symbol, orderType, stock.sector || ""
-    );
-    setSubmitting(false);
-    if (success) {
-      if (onTradeSuccess) onTradeSuccess();
-      onClose();
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>✕</button>
-
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem" }}>{stock?.symbol}</h3>
-            <span className="badge badge-cyan">{stock?.sector}</span>
-          </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "var(--text-muted)" }}>{stock?.name}</div>
-        </div>
-
-        <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: "1.3rem", fontWeight: 600 }}>
-              ₹{stock?.price?.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem" }} className={stock?.changePercent >= 0 ? "pos" : "neg"}>
-              {stock?.changePercent >= 0 ? "▲" : "▼"} {Math.abs(stock?.changePercent ?? 0).toFixed(2)}%
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginBottom: 2 }}>H: ₹{stock?.high?.toFixed(2)} / L: ₹{stock?.low?.toFixed(2)}</div>
-            <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>Vol: {stock?.volume}</div>
-          </div>
-        </div>
-
-        <div className="tabs" style={{ marginBottom: 20 }}>
-          <button className={`tab ${type === "BUY" ? "active" : ""}`} onClick={() => setType("BUY")} style={{ color: type === "BUY" ? "var(--accent-green)" : undefined }}>▲ BUY</button>
-          <button className={`tab ${type === "SELL" ? "active" : ""}`} onClick={() => setType("SELL")} style={{ color: type === "SELL" ? "var(--accent-red)" : undefined }}>▼ SELL</button>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <label style={{ fontFamily: "var(--font-mono)", fontSize: "0.68rem", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Order Type</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              {["MARKET", "LIMIT"].map((o) => (
-                <button key={o} className={`btn btn-sm ${orderType === o ? "btn-primary" : "btn-outline"}`} onClick={() => setOrderType(o)}>{o}</button>
-              ))}
-            </div>
-          </div>
-
-          {orderType === "LIMIT" && (
-            <div>
-              <label style={{ fontFamily: "var(--font-mono)", fontSize: "0.68rem", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Limit Price (₹)</label>
-              <input type="number" value={limitPrice} onChange={(e) => setLimitPrice(parseFloat(e.target.value))} min="0.01" step="0.05" style={{ width: "100%" }} />
-            </div>
-          )}
-
-          <div>
-            <label style={{ fontFamily: "var(--font-mono)", fontSize: "0.68rem", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Quantity</label>
-            <input type="number" value={qty} onChange={(e) => setQty(Math.max(1, parseInt(e.target.value) || 1))} min="1" style={{ width: "100%" }} />
-          </div>
-
-          <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "12px 14px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--text-muted)" }}>Order Value</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 600 }}>₹{total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--text-muted)" }}>Available Balance</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem", color: canAfford ? "var(--accent-green)" : "var(--accent-red)" }}>₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-            </div>
-          </div>
-
-          {!canAfford && (
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "var(--accent-red)", textAlign: "center" }}>⚠ Insufficient funds</div>
-          )}
-
-          <button
-            className={`btn ${type === "BUY" ? "btn-green" : "btn-red"}`}
-            style={{ width: "100%", padding: "12px", fontSize: "0.85rem" }}
-            onClick={handleSubmit}
-            disabled={!canAfford || submitting}
-          >
-            {submitting ? "Placing order…" : `${type === "BUY" ? "▲ Buy" : "▼ Sell"} ${qty} × ${stock?.symbol}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+import React,{useState} from "react";
+import {useAuth} from "../context/AuthContext.jsx";
+const money=n=>"₹"+Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+export default function BuySellModal({stock,defaultType="BUY",onClose,onTradeSuccess}){
+ const {balance,executeTrade}=useAuth();const [type,setType]=useState(defaultType);const [qty,setQty]=useState("1");const [orderType,setOrderType]=useState("MARKET");const [limitPrice,setLimitPrice]=useState(String(stock?.price||0));const [step,setStep]=useState("entry");const [submitting,setSubmitting]=useState(false);
+ const quantity=Math.max(0,parseInt(qty,10)||0);const price=orderType==="MARKET"?Number(stock?.price||0):Number(limitPrice||0);const total=quantity*price;const valid=quantity>0&&price>0&&Number.isFinite(total);const canAfford=type==="SELL"||total<=balance;
+ const submit=async()=>{if(!valid||!canAfford||submitting)return;setSubmitting(true);const ok=await executeTrade(stock.symbol,type,quantity,price,stock.name||stock.symbol,orderType,stock.sector||"");setSubmitting(false);if(ok){if(onTradeSuccess)onTradeSuccess();setStep("success");}};
+ return <div className="modal-overlay trade-modal-overlay" onClick={onClose}><div className={"modal trade-modal "+(step==="success"?"trade-success-modal":"")} onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={onClose}>✕</button>
+ {step==="success"?<div className="trade-success"><div className="success-orbit"><span>✓</span></div><div className="trade-modal-kicker">PAPER ORDER EXECUTED</div><h2>{type==="BUY"?"Buy":"Sell"} order placed</h2><div className="success-total">{money(total)}</div><p>{quantity.toLocaleString("en-IN")} shares of {stock.symbol} have been {type==="BUY"?"added to":"sold from"} your virtual portfolio.</p><button className="trade-primary" onClick={onClose}>Back to portfolio</button><button className="trade-secondary" onClick={()=>{setStep("entry");setQty("1");}}>Place another order</button></div>:<>
+ <div className="trade-modal-top"><div className="trade-modal-kicker">{step==="preview"?"REVIEW YOUR ORDER":"PAPER TRADING"}</div><h2>{step==="preview"?"Preview order":type==="BUY"?"Buy shares":"Sell shares"}</h2><p>Virtual funds only. No real trade is sent to an exchange.</p></div>
+ <div className="trade-instrument"><div className="trade-instrument-logo">{stock?.symbol?.slice(0,1)}</div><div className="trade-instrument-meta"><strong>{stock?.symbol}</strong><span>{stock?.name}</span></div><div className="trade-instrument-price"><strong>{money(stock?.price)}</strong><span className={stock?.changePercent>=0?"positive":"negative"}>{stock?.changePercent>=0?"+":""}{Number(stock?.changePercent||0).toFixed(2)}%</span></div></div>
+ <div className="trade-side-toggle"><button className={type==="BUY"?"active buy":""} onClick={()=>setType("BUY")}>Buy</button><button className={type==="SELL"?"active sell":""} onClick={()=>setType("SELL")}>Sell</button></div>
+ {step==="entry"?<>
+ <div className="trade-field-label">ORDER TYPE</div><div className="trade-order-toggle">{["MARKET","LIMIT"].map(v=><button key={v} className={orderType===v?"active":""} onClick={()=>setOrderType(v)}>{v==="MARKET"?"Market":"Limit"}</button>)}</div>
+ {orderType==="LIMIT"&&<label className="trade-field"><span>Limit price (₹)</span><input type="number" value={limitPrice} onChange={e=>setLimitPrice(e.target.value)} min="0.05" step="0.05"/></label>}
+ <div className="trade-field-label">QUANTITY</div><div className="trade-quantity"><button onClick={()=>setQty(String(Math.max(1,quantity-1)))}>−</button><input inputMode="numeric" type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)}/><button onClick={()=>setQty(String(quantity+1))}>＋</button></div>
+ <div className="trade-quick-qty">{[1,5,10,25,50].map(n=><button key={n} className={quantity===n?"active":""} onClick={()=>setQty(String(n))}>{n}</button>)}</div>
+ <div className="trade-order-summary"><div><span>Price per share</span><strong>{money(price)}</strong></div><div><span>Order value</span><strong>{money(total)}</strong></div><div><span>Available virtual cash</span><strong>{money(balance)}</strong></div></div>
+ {!valid&&<div className="trade-validation">Enter a valid quantity and price.</div>}{!canAfford&&<div className="trade-validation">Insufficient virtual cash for this order.</div>}
+ <button className="trade-primary" disabled={!valid||!canAfford} onClick={()=>setStep("preview")}>Review order <span>→</span></button>
+ </>:<>
+ <div className="trade-preview"><div><span>Order type</span><strong>{orderType}</strong></div><div><span>Side</span><strong className={type==="BUY"?"positive":"negative"}>{type}</strong></div><div><span>Quantity</span><strong>{quantity.toLocaleString("en-IN")} shares</strong></div><div><span>Price</span><strong>{money(price)}</strong></div><div className="preview-total"><span>Estimated total</span><strong>{money(total)}</strong></div></div>
+ <button className="trade-primary" disabled={submitting} onClick={submit}>{submitting?"Placing paper order…":"Confirm paper order"}</button><button className="trade-secondary" onClick={()=>setStep("entry")}>Edit order</button>
+ </>}
+ </>}</div></div>;
 }
