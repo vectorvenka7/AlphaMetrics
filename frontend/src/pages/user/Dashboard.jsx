@@ -89,7 +89,7 @@ export default function Dashboard() {
           <div className="section-heading"><div><h2>Market watch</h2><p>Popular Indian stocks</p></div><button onClick={() => navigate("/market")}>See all <span>↗</span></button></div>
           <div className="market-list">
             {featured.slice(0, 6).map((s) => (
-              <article className="market-row" key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}>
+              <article className="market-row" key={s.symbol} onClick={() => navigate(`/stocks/${s.symbol}`)}>
                 <div className="stock-mark">{s.symbol.slice(0, 1)}</div>
                 <div className="stock-meta"><strong>{s.symbol}</strong><span>{s.name}</span></div>
                 <div className="stock-price"><strong>{money(s.price)}</strong><span className={s.changePercent >= 0 ? "positive" : "negative"}>{s.changePercent >= 0 ? "+" : ""}{Number(s.changePercent || 0).toFixed(2)}%</span></div>
@@ -102,7 +102,7 @@ export default function Dashboard() {
 
         <section className="trade-section">
           <div className="section-heading"><div><h2>Top movers</h2><p>Biggest positive moves in this sample feed</p></div></div>
-          <div className="mover-grid">{gainers.slice(0, 4).map((s) => <button className="mover-card" key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}><span>{s.symbol}</span><strong>{money(s.price)}</strong><em>↗ {Number(s.changePercent || 0).toFixed(2)}%</em></button>)}</div>
+          <div className="mover-grid">{gainers.slice(0, 4).map((s) => <button className="mover-card" key={s.symbol} onClick={() => navigate(`/stocks/${s.symbol}`)}><span>{s.symbol}</span><strong>{money(s.price)}</strong><em>↗ {Number(s.changePercent || 0).toFixed(2)}%</em></button>)}</div>
         </section>
 
         <section className="paper-note"><span>ⓘ</span><p><strong>Paper trading only.</strong> Your balance and orders use virtual funds. Prices in simulation mode are illustrative, not exchange quotes.</p></section>
