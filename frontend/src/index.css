@@ -1612,3 +1612,27 @@ body{background:#090d12}
  .card{border-radius:16px}.page-body>.card{padding:14px!important}
 }
 @media(max-width:390px){.trade-home{padding-left:11px;padding-right:11px}.quick-stats{gap:6px}.quick-stats>div{padding:10px 8px}.quick-stats strong{font-size:.72rem}.trade-modal{padding-left:15px;padding-right:15px}}
+
+
+/* Stock, holdings and order pages share the same compact instrument language */
+.stock-detail-hero,.market-layout>.card,.market-layout>div>.card{border-radius:18px}
+.market-layout .card-title,.page-body .card-title{letter-spacing:-.02em}
+.page-body .btn-green,.page-body .btn-primary{background:#16d99a;border-color:#16d99a;color:#06271d}
+.page-body .btn-green:hover,.page-body .btn-primary:hover{filter:brightness(1.08)}
+.page-body .badge-cyan{background:rgba(22,217,154,.1);color:#16d99a;border-color:rgba(22,217,154,.25)}
+.page-body .pos{color:#16d99a}
+@media(max-width:768px){
+ .page-body[style*="padding-top"]{padding-top:14px!important}
+ .market-layout .card{overflow:hidden}
+ .market-layout .market-stock-list-wrap>div{padding:12px 13px!important}
+ .market-layout .market-stock-list-wrap>div:active{background:#172a25!important}
+ .market-layout .card-header{gap:8px;flex-wrap:wrap}
+ .page-body .stat-card{border-radius:14px}
+ .page-body .card-header{align-items:flex-start}
+ .page-body .chart-container{height:190px!important}
+ .page-body .tabs{overflow-x:auto;white-space:nowrap}
+ .page-body .tabs .tab{flex:none}
+ .page-body .table-wrap{border-radius:12px}
+ .trade-page-heading h1{font-size:1.35rem}
+ .trade-welcome{margin-bottom:15px}
+}
