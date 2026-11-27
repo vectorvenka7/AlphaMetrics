@@ -8,7 +8,6 @@ import { stocksAPI, portfolioAPI } from "../../api/index.js";
 import { getMockStocks } from "../../data/mockStocks.js";
 
 const money = (value) => "₹" + Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
-const sampleTrend = Array.from({ length: 28 }, (_, i) => ({ day: i + 1, value: 1000000 + Math.sin(i / 3) * 36000 + i * 1800 + Math.cos(i) * 9000 }));
 
 export default function Dashboard() {
   const { user, balance, dataMode } = useAuth();
@@ -45,7 +44,7 @@ export default function Dashboard() {
   const marketValue = holdings.reduce((sum, p) => sum + p.value, 0);
   const pnl = holdings.reduce((sum, p) => sum + p.pnl, 0);
   const pnlPct = invested ? pnl / invested * 100 : 0;
-  const chartData = equity.length ? equity.map((p, i) => ({ day: i + 1, value: p.value })) : sampleTrend;
+  const chartData = equity.map((p, i) => ({ day: i + 1, value: p.value }));
   const gainers = [...stocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
   const featured = stocks.slice(0, 8);
 
