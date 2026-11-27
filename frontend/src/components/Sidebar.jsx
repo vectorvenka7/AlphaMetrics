@@ -21,7 +21,7 @@ export default function Sidebar({isOpen,onClose}) {
  const handleLogout=()=>{logout();navigate("/login");};
  return <><div className={"sidebar-overlay"+(isOpen?" visible":"")} onClick={onClose} aria-hidden="true"/>
  <aside className={"sidebar"+(isOpen?" open":"")}>
-  <div className="sidebar-logo"><div className="sidebar-logo-text-wrap"><div className="logo-text">traciii</div><div className="logo-sub">{isAdmin?"Admin Console":"Paper Trading"}</div></div><button className="sidebar-close-btn" onClick={onClose}>✕</button></div>
+  <div className="sidebar-logo"><div className="sidebar-logo-text-wrap"><div className="logo-text">AlphaMetrics</div><div className="logo-sub">{isAdmin?"Admin Console":"Paper Trading"}</div></div><button className="sidebar-close-btn" onClick={onClose}>✕</button></div>
   <nav className="sidebar-nav"><div className="nav-section-label">Workspace</div>
    {navItems.map(item=><div key={item.path} className={"nav-item"+(item.desktopOnly?" desktop-nav-item":"")+((location.pathname===item.path||(item.path==="/market"&&location.pathname.startsWith("/stocks/")))?" active":"")} onClick={()=>handleNav(item.path)} role="button" tabIndex={0} onKeyDown={e=>e.key==="Enter"&&handleNav(item.path)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></div>)}
    {!isAdmin&&<div className="nav-item desktop-nav-item" onClick={()=>handleNav("/settings")} role="button" tabIndex={0}><span className="nav-icon">⚙</span><span>Settings</span></div>}
