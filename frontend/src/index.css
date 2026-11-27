@@ -1580,3 +1580,5 @@ select option { background: var(--bg-elevated); }
   .stock-actions button { padding:7px 9px;min-width:42px; }
   .stock-meta span { max-width:110px; }
 }
+
+.chart-empty { height:100%; display:grid; place-items:center; text-align:center; color:#88a49b; font-size:.68rem; padding:18px; border-top:1px solid rgba(255,255,255,.04); }
