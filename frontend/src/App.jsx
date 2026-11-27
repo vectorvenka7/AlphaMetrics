@@ -10,6 +10,7 @@ import Orders         from "./pages/user/Orders.jsx";
 import Backtest       from "./pages/user/Backtest.jsx";
 import Market         from "./pages/user/Market.jsx";
 import News            from "./pages/user/News.jsx";
+import More            from "./pages/user/More.jsx";
 import StockDetail    from "./pages/user/StockDetail.jsx";
 import Leaderboard    from "./pages/user/Leaderboard.jsx";
 import Alerts         from "./pages/user/Alerts.jsx";
@@ -50,6 +51,7 @@ function AppRoutes() {
       <Route path="/backtest"        element={<PrivateRoute><Backtest /></PrivateRoute>} />
       <Route path="/market"          element={<PrivateRoute><Market /></PrivateRoute>} />
       <Route path="/news"            element={<PrivateRoute><News /></PrivateRoute>} />
+      <Route path="/more"            element={<PrivateRoute><More /></PrivateRoute>} />
       <Route path="/stocks/:symbol"  element={<PrivateRoute><StockDetail /></PrivateRoute>} />
       <Route path="/leaderboard"     element={<PrivateRoute><Leaderboard /></PrivateRoute>} />
       <Route path="/alerts"          element={<PrivateRoute><Alerts /></PrivateRoute>} />
