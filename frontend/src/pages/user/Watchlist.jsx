@@ -112,7 +112,7 @@ export default function Watchlist() {
                   {displayStocks.map((s) => (
                     <tr key={s.symbol}>
                       <td>
-                        <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--accent-cyan)", cursor: "pointer" }} onClick={() => navigate(`/stock/${s.symbol}`)}>{s.symbol}</div>
+                        <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--accent-cyan)", cursor: "pointer" }} onClick={() => navigate(`/stocks/${s.symbol}`)}>{s.symbol}</div>
                         <div style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>{s.sector}</div>
                       </td>
                       <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-primary)" }}>₹{s.price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
