@@ -1,260 +1,114 @@
-import React, { useState, useEffect } from "react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import React, { useEffect, useMemo, useState } from "react";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../../components/AppLayout.jsx";
+import BuySellModal from "../../components/BuySellModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { stocksAPI, portfolioAPI } from "../../api/index.js";
 import { getMockStocks } from "../../data/mockStocks.js";
 
-const SECTOR_COLORS = {
-  Banking:"#00d4ff", IT:"#00ff88", Energy:"#ff6b35", Auto:"#ffd700",
-  Pharma:"#b44dff", Telecom:"#ff3366", NBFC:"#00d4ff", Infrastructure:"#00ff88",
-  Consumer:"#ff6b35", FMCG:"#ffd700", Other:"#667eea",
-};
-
-const Tip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background:"var(--bg-elevated)", border:"1px solid var(--border-bright)", borderRadius:"var(--radius-md)", padding:"10px 14px" }}>
-      <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.7rem", color:"var(--text-muted)", marginBottom:4 }}>{label}</div>
-      <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.88rem", color:"var(--accent-green)", fontWeight:600 }}>
-        ₹{payload[0]?.value?.toLocaleString("en-IN", { maximumFractionDigits:0 })}
-      </div>
-    </div>
-  );
-};
+const money = (value) => "₹" + Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const sampleTrend = Array.from({ length: 28 }, (_, i) => ({ day: i + 1, value: 1000000 + Math.sin(i / 3) * 36000 + i * 1800 + Math.cos(i) * 9000 }));
 
 export default function Dashboard() {
   const { user, balance, dataMode } = useAuth();
   const navigate = useNavigate();
-  const [stocks,    setStocks]    = useState([]);
+  const [stocks, setStocks] = useState([]);
   const [positions, setPositions] = useState([]);
-  const [equity,    setEquity]    = useState([]);
-  const [indices,   setIndices]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [equity, setEquity] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [tradeType, setTradeType] = useState("BUY");
+  const [period, setPeriod] = useState("1M");
   const isMock = dataMode === "mock";
 
   useEffect(() => {
-    const loadStocks = isMock ? Promise.resolve(getMockStocks()) : stocksAPI.all();
-    const loadIdx    = isMock ? Promise.resolve([]) : stocksAPI.indices().catch(() => []);
-
-    Promise.all([loadStocks, portfolioAPI.positions(), portfolioAPI.equity(30), loadIdx])
-      .then(([s, p, eq, idx]) => { setStocks(s); setPositions(p); setEquity(eq); setIndices(idx); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-
-    const iv = setInterval(() => {
-      (isMock ? Promise.resolve(getMockStocks()) : stocksAPI.all()).then(setStocks).catch(console.error);
-    }, isMock ? 3000 : 60000);
-    return () => clearInterval(iv);
+    let alive = true;
+    const load = async () => {
+      const [s, p, e] = await Promise.all([
+        isMock ? Promise.resolve(getMockStocks()) : stocksAPI.all().catch(() => []),
+        portfolioAPI.positions().catch(() => []),
+        portfolioAPI.equity(30).catch(() => [])
+      ]);
+      if (alive) { setStocks(s || []); setPositions(p || []); setEquity(e || []); }
+    };
+    load();
+    const timer = setInterval(load, isMock ? 5000 : 60000);
+    return () => { alive = false; clearInterval(timer); };
   }, [isMock]);
 
-  const enriched = positions.map((p) => {
-    const live = stocks.find((s) => s.symbol === p.symbol);
-    const currentPrice = live?.price ?? p.avgPrice;
-    const value = currentPrice * p.qty;
-    const pnl   = (currentPrice - p.avgPrice) * p.qty;
-    const pnlPercent = ((currentPrice - p.avgPrice) / p.avgPrice) * 100;
-    return { ...p, currentPrice, value, pnl, pnlPercent };
-  });
+  const holdings = useMemo(() => positions.map((p) => {
+    const stock = stocks.find((s) => s.symbol === p.symbol);
+    const price = stock?.price ?? p.avgPrice;
+    return { ...p, price, value: price * p.qty, pnl: (price - p.avgPrice) * p.qty, stock };
+  }), [positions, stocks]);
+  const invested = holdings.reduce((sum, p) => sum + p.avgPrice * p.qty, 0);
+  const marketValue = holdings.reduce((sum, p) => sum + p.value, 0);
+  const pnl = holdings.reduce((sum, p) => sum + p.pnl, 0);
+  const pnlPct = invested ? pnl / invested * 100 : 0;
+  const chartData = equity.length ? equity.map((p, i) => ({ day: i + 1, value: p.value })) : sampleTrend;
+  const gainers = [...stocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
+  const featured = stocks.slice(0, 8);
 
-  const totalInvested = enriched.reduce((s, p) => s + p.avgPrice * p.qty, 0);
-  const totalValue    = enriched.reduce((s, p) => s + p.value, 0);
-  const totalPnl      = enriched.reduce((s, p) => s + p.pnl, 0);
-  const pnlPercent    = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(2) : "0.00";
-
-  // Real day P&L from equity curve
-  const dayPnl = equity.length >= 2
-    ? equity[equity.length - 1].value - equity[equity.length - 2].value
-    : 0;
-
-  const gainers = [...stocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
-  const losers  = [...stocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
-
-  // Sector allocation from real positions
-  const sectorMap = {};
-  enriched.forEach((p) => { const s = p.sector || "Other"; sectorMap[s] = (sectorMap[s] || 0) + p.value; });
-  const totalPos  = Object.values(sectorMap).reduce((a, b) => a + b, 0) || 1;
-  const sectorData = Object.entries(sectorMap).map(([name, val]) => ({
-    name, value: parseFloat(((val / totalPos) * 100).toFixed(1)), color: SECTOR_COLORS[name] || "#667eea",
-  }));
-
-  // Static NIFTY fallback if market closed
-  const displayIndices = indices.length > 0 ? indices : [
-    { name: "NIFTY 50",   value: "—", changePercent: 0 },
-    { name: "SENSEX",     value: "—", changePercent: 0 },
-    { name: "NIFTY BANK", value: "—", changePercent: 0 },
-  ];
+  const openTrade = (stock, type) => { setSelected(stock); setTradeType(type); };
 
   return (
-    <AppLayout title="Dashboard">
-      <div className="page-body" style={{ paddingTop: 20 }}>
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontFamily:"var(--font-display)", fontSize:"clamp(1.2rem,3vw,1.6rem)", fontWeight:800 }}>
-            Good {new Date().getHours() < 12 ? "Morning" : "Afternoon"}, {user?.name?.split(" ")[0]} 👋
-          </h1>
-          <p style={{ color:"var(--text-muted)", fontSize:"0.76rem", marginTop:4 }}>
-            {new Date().toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long" })}
-            {isMock ? " · Simulation mode" : " · Live NSE data"}
-          </p>
-        </div>
-
-        {/* Indices strip */}
-        <div className="grid-4" style={{ marginBottom:16 }}>
-          {displayIndices.map((idx) => (
-            <div key={idx.name} className="card" style={{ padding:"12px 14px" }}>
-              <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.62rem", color:"var(--text-muted)", marginBottom:4, textTransform:"uppercase", letterSpacing:"0.1em" }}>{idx.name}</div>
-              <div style={{ fontFamily:"var(--font-mono)", fontSize:"1rem", fontWeight:600, color:"var(--text-primary)", marginBottom:2 }}>
-                {typeof idx.value === "number" ? idx.value.toLocaleString("en-IN") : idx.value}
-              </div>
-              {typeof idx.changePercent === "number" && idx.value !== "—" && (
-                <div className={idx.changePercent >= 0 ? "pos" : "neg"} style={{ fontFamily:"var(--font-mono)", fontSize:"0.7rem" }}>
-                  {idx.changePercent >= 0 ? "▲" : "▼"} {Math.abs(idx.changePercent).toFixed(2)}%
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Stats row */}
-        <div className="grid-4" style={{ marginBottom:16 }}>
-          {[
-            { label:"Portfolio Value", value:`₹${totalValue.toLocaleString("en-IN",{maximumFractionDigits:0})}`,  change:`${pnlPercent >= 0 ? "+" : ""}${pnlPercent}%`,          color:"green",                      icon:"◎" },
-            { label:"Total P&L",      value:`₹${totalPnl.toLocaleString("en-IN",{maximumFractionDigits:0})}`,    change:`${totalPnl >= 0 ? "+" : ""}${pnlPercent}%`,             color:totalPnl >= 0 ? "green":"red", icon:"⬡" },
-            { label:"Day's P&L",      value:`${dayPnl >= 0 ? "+" : ""}₹${Math.abs(dayPnl).toLocaleString("en-IN",{maximumFractionDigits:0})}`, change:"vs yesterday", color:dayPnl >= 0 ? "cyan":"red", icon:"◈" },
-            { label:"Available Cash", value:`₹${balance.toLocaleString("en-IN",{maximumFractionDigits:0})}`,     change:`${enriched.length} positions`,                          color:"gold",                       icon:"⬢" },
-          ].map((s) => (
-            <div key={s.label} className={`stat-card ${s.color}`}>
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-label">{s.label}</div>
-              <div className="stat-value">{s.value}</div>
-              <div className={`stat-change ${s.color==="red"?"neg":s.color==="green"?"pos":"neutral"}`}>{s.change}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Charts row */}
-        <div className="grid-2" style={{ marginBottom:16 }}>
-          {/* Real equity curve */}
-          <div className="card">
-            <div className="card-header">
-              <div><div className="card-title">Portfolio Performance</div><div className="card-subtitle">30-day equity (real trades)</div></div>
-              <span className={`badge ${totalPnl >= 0 ? "badge-green" : "badge-red"}`}>{totalPnl >= 0 ? "+" : ""}{pnlPercent}%</span>
-            </div>
-            <div className="chart-container" style={{ height:200 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equity} margin={{ top:5, right:5, left:0, bottom:0 }}>
-                  <defs>
-                    <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#00ff88" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#00ff88" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fontSize:10, fill:"var(--text-muted)" }} tickLine={false} axisLine={false} interval={6} tickFormatter={(d)=>d.slice(5)} />
-                  <YAxis tick={{ fontSize:10, fill:"var(--text-muted)" }} tickLine={false} axisLine={false} tickFormatter={(v)=>`${(v/100000).toFixed(0)}L`} />
-                  <Tooltip content={<Tip />} />
-                  <Area type="monotone" dataKey="value" stroke="#00ff88" strokeWidth={2} fill="url(#pg)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+    <AppLayout title="My Portfolio">
+      <main className="trade-home">
+        <section className="trade-welcome">
+          <div>
+            <div className="eyebrow">YOUR INVESTMENT SPACE</div>
+            <h1>Good {new Date().getHours() < 12 ? "morning" : "afternoon"}, {user?.name?.split(" ")[0] || "Trader"}</h1>
+            <p>Track the market. Practice with confidence.</p>
           </div>
+          <span className={`mode-pill ${isMock ? "sim" : "live"}`}><i />{isMock ? "SIMULATED PRICES" : "MARKET DATA"}</span>
+        </section>
 
-          {/* Sector allocation */}
-          <div className="card">
-            <div className="card-header">
-              <div><div className="card-title">Sector Allocation</div><div className="card-subtitle">Portfolio distribution</div></div>
-            </div>
-            {sectorData.length > 0 ? (
-              <div className="sector-allocation-inner">
-                <div className="sector-pie-wrap">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={sectorData} cx="50%" cy="50%" innerRadius={42} outerRadius={65} dataKey="value" paddingAngle={3}>
-                        {sectorData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background:"var(--bg-elevated)", border:"1px solid var(--border)", borderRadius:8, fontSize:11 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  {sectorData.map((s) => (
-                    <div key={s.name} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:8, minWidth:0 }}>
-                        <div style={{ width:8, height:8, borderRadius:"50%", background:s.color, flexShrink:0 }} />
-                        <span style={{ fontFamily:"var(--font-mono)", fontSize:"0.7rem", color:"var(--text-secondary)" }}>{s.name}</span>
-                      </div>
-                      <span style={{ fontFamily:"var(--font-mono)", fontSize:"0.7rem", color:"var(--text-primary)", marginLeft:6 }}>{s.value}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="empty-state"><div className="empty-icon">📊</div><p>Buy stocks to see your sector allocation.</p></div>
-            )}
+        <section className="hero-balance">
+          <div className="hero-balance-head"><span>PORTFOLIO VALUE</span><span className="hero-live-dot">● PAPER ACCOUNT</span></div>
+          <div className="hero-balance-value">{money(balance + marketValue)}</div>
+          <div className={`hero-pnl ${pnl >= 0 ? "positive" : "negative"}`}>{pnl >= 0 ? "↗" : "↘"} {money(Math.abs(pnl))} ({pnlPct.toFixed(2)}%) <span>overall unrealised P&L</span></div>
+          <div className="hero-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs><linearGradient id="heroGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16d99a" stopOpacity=".34"/><stop offset="100%" stopColor="#16d99a" stopOpacity="0"/></linearGradient></defs>
+                <XAxis dataKey="day" hide />
+                <Tooltip contentStyle={{ background: "#151a20", border: "1px solid #29343b", borderRadius: 10, color: "#fff" }} formatter={(v) => [money(v), "Portfolio"]} />
+                <Area type="monotone" dataKey="value" stroke="#19dfa0" strokeWidth={2.5} fill="url(#heroGreen)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        </div>
+          <div className="chart-periods">{["1W", "1M", "3M", "1Y", "ALL"].map((p) => <button key={p} className={period === p ? "selected" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div>
+        </section>
 
-        {/* Gainers / Losers */}
-        <div className="grid-2" style={{ marginBottom:16 }}>
-          {[{ title:"Top Gainers", data:gainers, isGain:true },{ title:"Top Losers", data:losers, isGain:false }].map(({ title, data, isGain }) => (
-            <div key={title} className="card">
-              <div className="card-header">
-                <div className="card-title">{title}</div>
-                <span className={`badge ${isGain ? "badge-green" : "badge-red"}`}>{isGain ? "▲ NSE" : "▼ NSE"}</span>
-              </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {data.map((s) => (
-                  <div key={s.symbol}
-                    onClick={() => navigate(`/stocks/${s.symbol}`)}
-                    style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 10px", background:"var(--bg-elevated)", borderRadius:"var(--radius-md)", border:"1px solid var(--border)", cursor:"pointer", transition:"var(--transition)" }}
-                  >
-                    <div>
-                      <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.76rem", fontWeight:600, color:"var(--text-primary)" }}>{s.symbol}</div>
-                      <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.62rem", color:"var(--text-muted)" }}>{s.sector}</div>
-                    </div>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontFamily:"var(--font-mono)", fontSize:"0.8rem" }}>₹{s.price.toLocaleString("en-IN")}</div>
-                      <div className={s.changePercent >= 0 ? "pos" : "neg"} style={{ fontSize:"0.7rem" }}>{s.changePercent >= 0 ? "▲" : "▼"}{Math.abs(s.changePercent).toFixed(2)}%</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <section className="quick-stats">
+          <div><span>Available cash</span><strong>{money(balance)}</strong><small>Virtual funds</small></div>
+          <div><span>Invested</span><strong>{money(invested)}</strong><small>{holdings.length} holdings</small></div>
+          <div><span>Market value</span><strong>{money(marketValue)}</strong><small>Current positions</small></div>
+        </section>
 
-        {/* Positions table */}
-        <div className="card">
-          <div className="card-header">
-            <div><div className="card-title">Open Positions</div><div className="card-subtitle">{enriched.length} active positions</div></div>
-            <span className="badge badge-cyan">{enriched.length} Positions</span>
+        <section className="trade-section">
+          <div className="section-heading"><div><h2>Market watch</h2><p>Popular Indian stocks</p></div><button onClick={() => navigate("/market")}>See all <span>↗</span></button></div>
+          <div className="market-list">
+            {featured.slice(0, 6).map((s) => (
+              <article className="market-row" key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}>
+                <div className="stock-mark">{s.symbol.slice(0, 1)}</div>
+                <div className="stock-meta"><strong>{s.symbol}</strong><span>{s.name}</span></div>
+                <div className="stock-price"><strong>{money(s.price)}</strong><span className={s.changePercent >= 0 ? "positive" : "negative"}>{s.changePercent >= 0 ? "+" : ""}{Number(s.changePercent || 0).toFixed(2)}%</span></div>
+                <div className="stock-actions"><button onClick={(e) => { e.stopPropagation(); openTrade(s, "BUY"); }}>Buy</button></div>
+              </article>
+            ))}
+            {!featured.length && <p className="empty-note">Market list is loading. Try again in a moment.</p>}
           </div>
-          {loading ? (
-            <div style={{ textAlign:"center", padding:"20px 0", fontFamily:"var(--font-mono)", fontSize:"0.75rem", color:"var(--text-muted)" }}>Loading…</div>
-          ) : enriched.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">📈</div><p>No open positions. Go to Market to buy your first stock.</p></div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Price</th><th>LTP</th><th>Value</th><th>P&L</th><th>P&L %</th></tr></thead>
-                <tbody>
-                  {enriched.map((p) => (
-                    <tr key={p.symbol} onClick={() => navigate(`/stocks/${p.symbol}`)} style={{ cursor:"pointer" }}>
-                      <td><div className="stock-name-cell"><div className="stock-symbol">{p.symbol}</div><div style={{ fontSize:"0.62rem", color:"var(--text-muted)" }}>{p.name}</div></div></td>
-                      <td>{p.qty}</td>
-                      <td>₹{p.avgPrice.toFixed(2)}</td>
-                      <td className="price-cell">₹{p.currentPrice.toFixed(2)}</td>
-                      <td>₹{p.value.toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
-                      <td className={p.pnl >= 0 ? "pos" : "neg"}>{p.pnl >= 0 ? "+" : ""}₹{p.pnl.toFixed(2)}</td>
-                      <td className={p.pnlPercent >= 0 ? "pos" : "neg"}>{p.pnlPercent >= 0 ? "▲" : "▼"} {Math.abs(p.pnlPercent).toFixed(2)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+        </section>
+
+        <section className="trade-section">
+          <div className="section-heading"><div><h2>Top movers</h2><p>Biggest positive moves in this sample feed</p></div></div>
+          <div className="mover-grid">{gainers.slice(0, 4).map((s) => <button className="mover-card" key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}><span>{s.symbol}</span><strong>{money(s.price)}</strong><em>↗ {Number(s.changePercent || 0).toFixed(2)}%</em></button>)}</div>
+        </section>
+
+        <section className="paper-note"><span>ⓘ</span><p><strong>Paper trading only.</strong> Your balance and orders use virtual funds. Prices in simulation mode are illustrative, not exchange quotes.</p></section>
+      </main>
+      {selected && <BuySellModal stock={selected} defaultType={tradeType} onClose={() => setSelected(null)} onTradeSuccess={() => portfolioAPI.positions().then(setPositions).catch(() => {})} />}
     </AppLayout>
   );
 }
